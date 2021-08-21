@@ -1,5 +1,7 @@
 <?php
 
+namespace Database\Seeders;
+
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -20,7 +22,7 @@ class CBSeeder extends Seeder
             $cms_users = DB::table('cms_users')->insert([
                 'created_at' => date('Y-m-d H:i:s'),
                 'name' => 'Super Admin',
-                'email' => 'admin@crudbooster.com',
+                'email' => 'admin@admin.com',
                 'password' => $password,
                 'id_cms_privileges' => 1,
                 'status' => 'Active',
