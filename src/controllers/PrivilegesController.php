@@ -1,4 +1,6 @@
-<?php namespace crocodicstudio\crudbooster\controllers;
+<?php
+
+namespace crocodicstudio\crudbooster\controllers;
 
 use CRUDBooster;
 use Illuminate\Support\Facades\DB;
@@ -21,9 +23,9 @@ class PrivilegesController extends CBController
         $this->button_action_style = 'button_icon';
         $this->button_detail = false;
         $this->button_bulk_action = false;
+        $this->show_numbering = TRUE;
 
         $this->col = [];
-        $this->col[] = ["label" => "ID", "name" => "id"];
         $this->col[] = ["label" => "Name", "name" => "name"];
         $this->col[] = [
             "label" => "Superadmin",
@@ -36,17 +38,17 @@ class PrivilegesController extends CBController
         $this->form[] = ["label" => "Is Superadmin", "name" => "is_superadmin", 'required' => true];
         $this->form[] = ["label" => "Theme Color", "name" => "theme_color", 'required' => true];
 
-        $this->alert[] = [
-            'message' => "You can use the helper <code>CRUDBooster::getMyPrivilegeId()</code> to get current user login privilege id, or <code>CRUDBooster::getMyPrivilegeName()</code> to get current user login privilege name",
-            'type' => 'info',
-        ];
+//        $this->alert[] = [
+//            'message' => "You can use the helper <code>CRUDBooster::getMyPrivilegeId()</code> to get current user login privilege id, or <code>CRUDBooster::getMyPrivilegeName()</code> to get current user login privilege name",
+//            'type' => 'info',
+//        ];
     }
 
     public function getAdd()
     {
         $this->cbLoader();
 
-        if (! CRUDBooster::isCreate() && $this->global_privilege == false) {
+        if (!CRUDBooster::isCreate() && $this->global_privilege == false) {
             CRUDBooster::insertLog(cbLang('log_try_add', ['module' => CRUDBooster::getCurrentModule()->name]));
             CRUDBooster::redirect(CRUDBooster::adminPath(), cbLang("denied_access"));
         }
@@ -63,7 +65,7 @@ class PrivilegesController extends CBController
     {
         $this->cbLoader();
 
-        if (! CRUDBooster::isCreate() && $this->global_privilege == false) {
+        if (!CRUDBooster::isCreate() && $this->global_privilege == false) {
             CRUDBooster::insertLog(cbLang('log_try_add_save', [
                 'name' => Request::input($this->title_field),
                 'module' => CRUDBooster::getCurrentModule()->name,
@@ -108,7 +110,7 @@ class PrivilegesController extends CBController
 
         $row = DB::table($this->table)->where("id", $id)->first();
 
-        if (! CRUDBooster::isRead() && $this->global_privilege == false) {
+        if (!CRUDBooster::isRead() && $this->global_privilege == false) {
             CRUDBooster::insertLog(cbLang("log_try_edit", [
                 'name' => $row->{$this->title_field},
                 'module' => CRUDBooster::getCurrentModule()->name,
@@ -130,7 +132,7 @@ class PrivilegesController extends CBController
 
         $row = CRUDBooster::first($this->table, $id);
 
-        if (! CRUDBooster::isUpdate() && $this->global_privilege == false) {
+        if (!CRUDBooster::isUpdate() && $this->global_privilege == false) {
             CRUDBooster::insertLog(cbLang("log_try_add", ['name' => $row->{$this->title_field}, 'module' => CRUDBooster::getCurrentModule()->name]));
             CRUDBooster::redirect(CRUDBooster::adminPath(), cbLang('denied_access'));
         }
@@ -194,7 +196,13 @@ class PrivilegesController extends CBController
 
         $row = DB::table($this->table)->where($this->primary_key, $id)->first();
 
-        if (! CRUDBooster::isDelete() && $this->global_privilege == false) {
+        //check foreign id
+        $user = DB::table('cms_users')->where('id_cms_privileges', $id)->count();
+        if ($user > 0) {
+            return CRUDBooster::redirectBack('Data in use . unable to delete!');
+        }
+
+        if (!CRUDBooster::isDelete() && $this->global_privilege == false) {
             CRUDBooster::insertLog(cbLang("log_try_delete", [
                 'name' => $row->{$this->title_field},
                 'module' => CRUDBooster::getCurrentModule()->name,
