@@ -157,7 +157,8 @@ class CRUDBooster
 
     public static function insert($table, $data = [])
     {
-        if (! $data['created_at']) {
+        $data['id'] = DB::table($table)->max('id') + 1;
+        if (!$data['created_at']) {
             if (Schema::hasColumn($table, 'created_at')) {
                 $data['created_at'] = date('Y-m-d H:i:s');
             }
@@ -528,24 +529,11 @@ class CRUDBooster
 				function(){  location.href=\"$redirectTo\" });";
     }
 
-    public static function getModulePath()
+    private static function getModulePath()
     {
-        // Check to position of admin_path
-        if(config("crudbooster.ADMIN_PATH")) {
-            $adminPathSegments = explode('/', Request::path());
-            $no = 1;
-            foreach($adminPathSegments as $path) {
-                if($path == config("crudbooster.ADMIN_PATH")) {
-                    $segment = $no+1;
-                    break;
-                }
-                $no++;
-            }
-        } else {
-            $segment = 1;
-        }
+        $adminPathSegments = count(explode('/', config('crudbooster.ADMIN_PATH')));
 
-        return Request::segment($segment);
+        return Request::segment(1 + $adminPathSegments);
     }
 
     public static function mainpath($path = null)
@@ -1065,17 +1053,15 @@ class CRUDBooster
 
     public static function insertLog($description, $details = '')
     {
-        if (CRUDBooster::getSetting('api_debug_mode')) {
-            $a = [];
-            $a['created_at'] = date('Y-m-d H:i:s');
-            $a['ipaddress'] = $_SERVER['REMOTE_ADDR'];
-            $a['useragent'] = $_SERVER['HTTP_USER_AGENT'];
-            $a['url'] = Request::url();
-            $a['description'] = $description;
-            $a['details'] = $details;
-            $a['id_cms_users'] = self::myId();
-            DB::table('cms_logs')->insert($a);
-        }
+        $a = [];
+        $a['created_at'] = date('Y-m-d H:i:s');
+        $a['ipaddress'] = $_SERVER['REMOTE_ADDR'];
+        $a['useragent'] = $_SERVER['HTTP_USER_AGENT'];
+        $a['url'] = Request::url();
+        $a['description'] = $description;
+        $a['details'] = $details;
+        $a['id_cms_users'] = self::myId();
+        DB::table('cms_logs')->insert($a);
     }
 
     public static function referer()
@@ -1089,6 +1075,7 @@ class CRUDBooster
         $multiple_db = config('crudbooster.MULTIPLE_DATABASE_MODULE');
         $multiple_db = ($multiple_db) ? $multiple_db : [];
         $db_database = config('crudbooster.MAIN_DB_DATABASE');
+        $db_schema = config('crudbooster.DB_SCHEMA');
 
         if ($multiple_db) {
             try {
@@ -1100,7 +1087,7 @@ class CRUDBooster
             }
         } else {
             try {
-                $tables = DB::select("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.Tables WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_SCHEMA = '".$db_database."'");
+                $tables = DB::select("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.Tables WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_SCHEMA = '".$db_schema."'");
             } catch (\Exception $e) {
                 $tables = [];
             }
@@ -1141,7 +1128,7 @@ class CRUDBooster
     {
         $allowedUserAgent = config('crudbooster.API_USER_AGENT_ALLOWED');
         $user_agent = Request::header('User-Agent');
-        $authorization = Request::header('Authorization');
+        $time = Request::header('X-Authorization-Time');
 
         if ($allowedUserAgent && count($allowedUserAgent)) {
             $userAgentValid = false;
@@ -1152,22 +1139,70 @@ class CRUDBooster
                 }
             }
             if ($userAgentValid == false) {
-                $result['api_status'] = 0;
+                $result['api_status'] = false;
                 $result['api_message'] = "THE DEVICE AGENT IS INVALID";
-                $res = response()->json($result, 400);
+                $res = response()->json($result, 200);
                 $res->send();
                 exit;
             }
         }
 
-        $accessToken = ltrim($authorization,"Bearer ");
-        $accessTokenData = Cache::get("api_token_".$accessToken);
-        if(!$accessTokenData) {
-            response()->json([
-                'api_status'=> 0,
-                'api_message'=> 'Forbidden Access!'
-            ], 403)->send();
-            exit;
+        if (self::getSetting('api_debug_mode') == 'false') {
+
+            $result = [];
+            $validator = Validator::make([
+                'X-Authorization-Token' => Request::header('X-Authorization-Token'),
+                'X-Authorization-Time' => Request::header('X-Authorization-Time'),
+                'useragent' => Request::header('User-Agent'),
+            ], [
+                'X-Authorization-Token' => 'required',
+                'X-Authorization-Time' => 'required',
+                'useragent' => 'required',
+            ]);
+
+            if ($validator->fails()) {
+                $message = $validator->errors()->all();
+                $result['api_status'] = 0;
+                $result['api_message'] = implode(', ', $message);
+                $res = response()->json($result, 200);
+                $res->send();
+                exit;
+            }
+
+            $keys = DB::table('cms_apikey')->where('status', 'active')->pluck('screetkey');
+            $server_token = [];
+            $server_token_screet = [];
+            foreach ($keys as $key) {
+                $server_token[] = md5($key . $time . $user_agent);
+                $server_token_screet[] = $key;
+            }
+
+            $sender_token = Request::header('X-Authorization-Token');
+
+            if (!Cache::has($sender_token)) {
+                if (!in_array($sender_token, $server_token)) {
+                    $result['api_status'] = false;
+                    $result['api_message'] = "THE TOKEN IS NOT MATCH WITH SERVER TOKEN";
+                    $res = response()->json($result, 200);
+                    $res->send();
+                    exit;
+                }
+            } else {
+                if (Cache::get($sender_token) != $user_agent) {
+                    $result['api_status'] = false;
+                    $result['api_message'] = "THE TOKEN IS ALREADY BUT NOT MATCH WITH YOUR DEVICE";
+                    $res = response()->json($result, 200);
+                    $res->send();
+                    exit;
+                }
+            }
+
+            $id = array_search($sender_token, $server_token);
+            $server_screet = $server_token_screet[$id];
+            DB::table('cms_apikey')->where('screetkey', $server_screet)->increment('hit');
+
+            $expired_token = date('Y-m-d H:i:s', strtotime('+5 seconds'));
+            Cache::put($sender_token, $user_agent, $expired_token);
         }
     }
 

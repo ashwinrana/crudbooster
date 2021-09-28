@@ -1,5 +1,5 @@
 {
-    "name": "crocodicstudio/crudbooster",
+    "name": "ashwinrana/crudbooster",
     "description": "CRUDBooster Is CRUD Generator Based On Laravel Easy To Make An Advanced Backend",
     "type": "library",
     "license": "MIT",
@@ -16,6 +16,10 @@
         {
             "name": "Ferry",
             "email": "ferry@crocodic.com"
+        },
+        {
+          "name": "Ashwin",
+          "email": "ashwinrana10@gmail.com"
         }
     ],
     "minimum-stability": "stable",

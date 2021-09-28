@@ -17,16 +17,30 @@ class CBSeeder extends Seeder
         $this->command->info('Please wait updating the data...');
         # User
         if (DB::table('cms_users')->count() == 0) {
-            $password = Hash::make('123456');
+            $password = Hash::make('Admin#123');
             $cms_users = DB::table('cms_users')->insert([
                 'created_at' => date('Y-m-d H:i:s'),
                 'name' => 'Super Admin',
-                'email' => 'admin@crudbooster.com',
+                'email' => 'superadmin@admin.com',
+                'user_name' => 'superadmin',
                 'password' => $password,
                 'id_cms_privileges' => 1,
                 'status' => 'Active',
             ]);
         }
+        if (DB::table('cms_users')->count() == 1) {
+            $password = Hash::make('Admin#123');
+            $cms_users = DB::table('cms_users')->insert([
+                'created_at' => date('Y-m-d H:i:s'),
+                'name' => 'Admin',
+                'email' => 'admin@admin.com',
+                'password' => $password,
+                'id_cms_privileges' => 2,
+                'status' => '1',
+                'user_name' => 'admin'
+            ]);
+        }
+
         $this->command->info("Create users completed");
         # User End
 
